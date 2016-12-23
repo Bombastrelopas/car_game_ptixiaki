@@ -22,15 +22,15 @@ public class timoni_turn : MonoBehaviour {
 
         if (Input.GetKey("left"))
         {
-            rotato = Quaternion.Euler(-1.7974f, 77.5429f, 58.0161f);
-            transform.localRotation = Quaternion.Slerp(transform.localRotation, rotato, 0.15f);
+            rotato = Quaternion.Euler(0f, 0f, 30f);
+            transform.localRotation = Quaternion.Slerp(transform.localRotation, rotato, 0.10f);
 
         }
 
         else if (Input.GetKey("right"))
         {
-            rotato = Quaternion.Euler(10.2286f, 80.7875f, -48.4994f);
-            transform.localRotation = Quaternion.Slerp(transform.localRotation, rotato, 0.15f);
+            rotato = Quaternion.Euler(0f, 0f, 30f);
+            transform.localRotation = Quaternion.Slerp(transform.localRotation, rotato, 0.10f);
             
         }
         else

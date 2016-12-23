@@ -2,17 +2,20 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine.UI;
+using UnityEngine.Networking;
 
-public class PreviewCamera : MonoBehaviour   {
+public class PreviewCameraNET : NetworkBehaviour   {
     public Transform[] cameraPos;
     public bool finished = false; 
     public float fraction = 0;
     public float speed = 0.2f;
     public bool previewing = true;
     //The script of camera_change to enable the camera
-    cam_change camChange;
-    public NewCaz mainCarScript;
-    
+    public cam_change camChange;
+    public NetworkCar mainCarScript;
+    public PlayerID playerIDScript;
+    public bool runningFanari;
+
 
     //Fanari states array
     public Image[] fanaria;
@@ -23,8 +26,9 @@ public class PreviewCamera : MonoBehaviour   {
     //Fill the array with the caamera positions for the race preview
 	void Start () {
         //Get the scripts corresponding to this car
-        mainCarScript = transform.root.GetComponent<NewCaz>();
+        mainCarScript = transform.root.GetComponent<NetworkCar>();
         camChange = transform.root.GetComponent<cam_change>();
+        playerIDScript = transform.root.GetComponent<PlayerID>();
         //Fill the array (indexes 0 and 1 will be useless)
         cameraPos = transform.parent.GetComponentsInChildren<Transform>();
         //Set first camera at position 2
@@ -48,6 +52,7 @@ public class PreviewCamera : MonoBehaviour   {
 
         //Set Previewing to true so the user can't change cameras with enter on cam_change script
         camChange.previewing = true;
+        runningFanari = false;
 
 
 
@@ -61,14 +66,31 @@ public class PreviewCamera : MonoBehaviour   {
         }
 
         //Stop the preview
-        if (Input.GetKeyUp("a"))
+        if(GameObject.Find("Player1")== null || GameObject.Find("Player2") == null)
         {
-                StopCoroutine(preview); //Stop the routine
-                camChange.camera1.enabled = true; //Enable main camera
-                gameObject.GetComponent<Camera>().enabled = false; //Disable preview camerra
+            return;
+        }
+        if (GameObject.Find("Player1").GetComponent<PlayerID>().wantsToRace == true && GameObject.Find("Player2").GetComponent<PlayerID>().wantsToRace == true && !runningFanari)  
+        {
+            //Disable the text waiting for opponent
+            if (GameObject.Find("WaitingOpponent") != null)
+            {
+                GameObject.Find("WaitingOpponent").SetActive(false);
+            }
 
-                //Start showing start of the race fanari
-                StartCoroutine(Fanari());
+
+            StopCoroutine(preview); //Stop the routine
+
+            //Check to enable the camera only of the local car and not of the other car
+            if (gameObject.transform.root.GetComponent<cam_change>().enabled)
+            {
+                    camChange.camera1.enabled = true; //Enable main camera
+            }
+
+            gameObject.GetComponent<Camera>().enabled = false; //Disable preview camerra
+
+            //Start showing start of the race fanari
+            StartCoroutine(Fanari());
         }
 
     }
@@ -122,6 +144,7 @@ public class PreviewCamera : MonoBehaviour   {
     //Set up the starting lights and after it goes to the green start the race
     IEnumerator Fanari()
     {
+        runningFanari = true;
         fanaria[1].enabled = true;
         yield return new WaitForSeconds(1);
         fanaria[2].enabled = true;
@@ -141,11 +164,15 @@ public class PreviewCamera : MonoBehaviour   {
         yield return new WaitForSeconds(1);
         fanaria[2].transform.root.gameObject.SetActive(false);
 
-        //Enable music
-        gameObject.transform.root.FindChild("MusicController").GetComponent<MusicBox>().enabled = true;
+        //Enable music if it's the local player
+        if (gameObject.transform.root.GetComponent<cam_change>().enabled)
+        {
+            gameObject.transform.root.FindChild("MusicController").GetComponent<MusicBox>().enabled = true;
+        }
 
         //After all is done disable this script for the rest of the game
-        gameObject.GetComponent<PreviewCamera>().enabled = false;
+        gameObject.GetComponent<PreviewCameraNET>().enabled = false;
+        camChange.previewing = false;
 
     }
 

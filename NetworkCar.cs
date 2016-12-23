@@ -20,14 +20,27 @@ public class NetworkCar : NetworkBehaviour
     public Rigidbody rb;
     public float ExtraCarWeight = 500;
     public float mass;
-    
+
+    //Texture variables
+    public Texture alternativeEmission;
+    public Texture normalEmission;
+    public Renderer rend;
+    public Renderer rend2;
+    public Renderer rendBody;
+    public Renderer rendBody2;
+    public Renderer rendBody3;
 
     //Other Booleans 
     public bool isboosted=false;
     public float boost_timer = 7;
+
+    [SyncVar]
     public float dead_timer = 0;
     public bool isGroundedBefore;
+
+    [SyncVar (hook = "OnCarDestroyed")]
     public bool carDestroyed=false;
+
     public bool gamePaused;
     public bool racing = false;  //If the car hasn't finished
 
@@ -52,7 +65,19 @@ public class NetworkCar : NetworkBehaviour
     public Vector3 localVelb;
 
     //Other Stuff
-    public GameObject wheels; 
+    public GameObject wheels;
+
+    //Trail_Emitters STuff
+    public GameObject trailEmitter_R;
+    public GameObject trailEmitter_L;
+    public GameObject trailEmitter_Pref;
+
+    public Transform  trailEmitterTrans;
+    public GameObject trailEmitterInstantiated;
+    public bool skidding;
+    public bool alreadySkidding;
+
+    public GameObject smokeEmitter;
 
     //GUI variables
     public Texture2D metroMeter;
@@ -89,6 +114,11 @@ public class NetworkCar : NetworkBehaviour
     //BlurScripts
     public Blur[] blurScripts;
 
+    //Network booleans
+    bool RoutineRunning;
+    public bool raceFinished = false;
+    public bool raceWon = false;
+
 
 
     // Get the Rigidbody
@@ -111,22 +141,38 @@ public class NetworkCar : NetworkBehaviour
         currentLap = 1;
         gamePaused = false;
 
+        //Skidmarks and Smoke Initialization
+        trailEmitter_R = gameObject.transform.Find("Skidmarks_Emitters/skidR").gameObject;
+        trailEmitter_L = gameObject.transform.Find("Skidmarks_Emitters/skidL").gameObject;
 
 
+        trailEmitter_Pref = GameObject.Find("Skidmarks_Emitters");
+        trailEmitterTrans = trailEmitter_Pref.transform;
+
+        skidding = false;
+        alreadySkidding = false;
+
+        smokeEmitter = gameObject.transform.FindChild("Smoke_Emitters").gameObject;
+
+        //Set emitters to inactive
+        trailEmitter_Pref.SetActive(false);
     
         //Set respawnpoint as start
         currentCheckpoint = 0;
 
-        /*
-        
-        
+
         //Get text component of GUI 
         timeTimer = GameObject.Find("TimeText").GetComponent<Text>();
         bestTime = 0;
-        */
 
         //Get Blur Scripts which will be enabled when game is paused
         blurScripts = GetComponentsInChildren<Blur>();
+
+        //Set the normal emission texture as the current onee
+        rend = GameObject.Find("rearRightLight").GetComponent<Renderer>();
+        rend2 = GameObject.Find("rearLeftLight").GetComponent<Renderer>();
+        rendBody = transform.Find("newcar/Car/Car_Outside/carBody").GetComponent<Renderer>();
+        normalEmission = rend.material.GetTexture("_EmissionMap");
 
 
         /*
@@ -137,170 +183,276 @@ public class NetworkCar : NetworkBehaviour
             Debug.Log(checkPointArray);
         } 
         */
-        racing = true;
-
 
 
         //Other stuff for tests delete after.
         //rb.centerOfMass = new Vector3(rb.centerOfMass.x, rb.centerOfMass.y, rb.centerOfMass.z+1);
         //transform.position = new Vector3(438.05f, 1.09f, 99.79f);
+        racing = true;
     }
 
 
+    void OnCarDestroyed(bool destroyed)
+    {
+        if (destroyed && !RoutineRunning)
+        {
+            StartCoroutine(CarSelfDestruct(transform.position));
+        }
+    }
 
 
 
     //Update Function
     void Update()
     {
-        //Check if the car is the localplayer
-        if (!isLocalPlayer)
+
+        if (raceFinished && isLocalPlayer)
+        {
+            if (raceWon)
+            {
+                Debug.Log("You won!");
+            }
+            else
+            {
+                Debug.Log("You lost!");
+            }
+
+        }
+        if (!isLocalPlayer || !racing)
         {
             return;
         }
-        if (racing)
+
+
+        //GUI updates
+        lapTime += Time.deltaTime;
+        timeTimer.text = lapTime.ToString("F3");
+
+
+        //Check if the car is moving if not then set it to nomoving(so that it won't turn) 
+        if (transform.InverseTransformDirection(rb.velocity).z > 0.01f || transform.InverseTransformDirection(rb.velocity).z < -0.01f)
         {
-
-
-            /*
-            //GUI updates
-            lapTime += Time.deltaTime;
-            timeTimer.text = lapTime.ToString("F3");
-            */
-
-
-            //Check if the car is moving 
-            if (rb.velocity == Vector3.zero)
-            {
-                isMoving = false;
-            }
-            else
-            {
-                isMoving = true;
-            }
+            isMoving = true;
+        }
+        else
+        {
+            isMoving = false;
+        }
 
 
 
-            //Check handbreak
-            if (Input.GetKey("space"))
-            {
-                handBreakDeactivated = false;
-            }
-            else
-            {
-                handBreakDeactivated = true;
-
-            }
-
-
-
-            //If user releases space the car stops drifting and lerps to forward velocity.
-            if (Input.GetKeyUp("space") && isGrounded)
-            {
-                lerpVal = 0.05f; //Lerp value smaller so the transition is slower since it's using handbreak
-                localVel = transform.InverseTransformDirection(rb.velocity);
-                t = 0;
-                lerpZ = true;
-            }
-
-
-
-            //Acceleration-Deceleration movement which will be used to give force to the car
-            if ((Input.GetKey("down")) && (speed > MaxBreak))
-            {
-                speed = speed - Acceleration * Time.deltaTime;
-            }
-            else if ((Input.GetKey("up")) && (speed < MaxSpeed))
-            {
-                speed = speed + Acceleration * Time.deltaTime;
-            }
-            else
-            {
-                if (speed > Deceleration * Time.deltaTime)
-                {
-                    speed = speed - Deceleration * Time.deltaTime;
-                }
-                else if (speed < -Deceleration * Time.deltaTime)
-                {
-                    speed = speed + Deceleration * Time.deltaTime;
-                }
-                else
-                {
-                    speed = 0;
-                }
-
-            }
-            if (Input.GetKey("right") && isGrounded && isMoving && TyresGrounded)
-            {
-                turnsRight = true;
-            }
-            else
-            {
-                turnsRight = false;
-
-            }
-            if (Input.GetKey("left") && isGrounded && isMoving && TyresGrounded)
-            {
-                turnsLeft = true;
-            }
-            else
-            {
-                turnsLeft = false;
-            }
-
-            //Destroy Car if destruction button pressed
-            if (Input.GetKeyUp("d") && !gamePaused && !carDestroyed)
-            {
-                StartCoroutine(CarSelfDestruct(transform.position));
-            }
-
-            //Pause the game if (S) is pressed.
-            if (Input.GetKeyUp("s"))
-            {
-                if (Time.timeScale == 1.0F)
-                {
-                    foreach (Blur blur in blurScripts)
-                    {
-                        blur.enabled = true;
-                    }
-
-                    pauseMenu.SetActive(true);
-                    gamePaused = true;
-                    Time.timeScale = 0.0F;
-                }
-                else
-                {
-                    foreach (Blur blur in blurScripts)
-                    {
-                        blur.enabled = false;
-                    }
-                    pauseMenu.SetActive(false);
-                    gamePaused = false;
-                    Time.timeScale = 1.0F;
-                }
-            }
-
-            //Exit game if user presses ESC and game is paused
-            if (Input.GetKeyUp(KeyCode.Escape) && gamePaused)
-            {
-                pauseMenu.SetActive(false);
-                gamePaused = false;
-                Time.timeScale = 1.0F;
-                SceneManager.LoadScene(0);
-
-            }
-
+        //Check handbreak
+        if (Input.GetKey("space"))
+        {
+            handBreakDeactivated = false;
+        }
+        else
+        {
+            handBreakDeactivated = true;
 
         }
 
 
+
+        //If user releases space the car stops drifting and lerps to forward velocity.
+        if (Input.GetKeyUp("space") && isGrounded)
+        {
+            lerpVal = 0.05f; //Lerp value smaller so the transition is slower since it's using handbreak
+            localVel = transform.InverseTransformDirection(rb.velocity);
+            t = 0;
+            lerpZ = true;
+        }
+
+
+
+        //Acceleration-Deceleration movement which will be used to give force to the car
+        if ((Input.GetKey("down")) && (speed > MaxBreak))
+        {
+            speed = speed - Acceleration * Time.deltaTime;
+         
+        }
+        else if ((Input.GetKey("up")) && (speed < MaxSpeed))
+        {
+            speed = speed + Acceleration * Time.deltaTime;
+        }
+        else
+        {
+            if (speed > Deceleration * Time.deltaTime)
+            {
+                speed = speed - Deceleration * Time.deltaTime;
+            }
+            else if (speed < -Deceleration * Time.deltaTime)
+            {
+                speed = speed + Deceleration * Time.deltaTime;
+            }
+            else
+            {
+                speed = 0;
+            }
+
+        }
+        if (Input.GetKey("right") && isGrounded && isMoving && TyresGrounded)
+        {
+            turnsRight = true;
+        }
+        else
+        {
+            turnsRight = false;
+
+        }
+        if (Input.GetKey("left") && isGrounded && isMoving && TyresGrounded)
+        {
+            turnsLeft = true;
+        }
+        else
+        {
+            turnsLeft = false;
+        }
+
+        //Destroy Car if destruction button pressed
+        if (Input.GetKeyUp("d") && !gamePaused && !carDestroyed)
+        {
+            CmdtellServerCarDestroyed(true);
+        }
+
+        //Pause the game if (S) is pressed.
+        if (Input.GetKeyUp("s"))
+        {
+            if (Time.timeScale == 1.0F)
+            {
+                foreach (Blur blur in blurScripts)
+                {
+                    blur.enabled = true;
+                }
+
+                pauseMenu.SetActive(true);
+                gamePaused = true;
+                Time.timeScale = 0.0F;
+            }
+            else
+            {
+                foreach (Blur blur in blurScripts)
+                {
+                    blur.enabled = false;
+                }
+                pauseMenu.SetActive(false);
+                gamePaused = false;
+                Time.timeScale = 1.0F;
+            }
+        }
+
+        //Exit game if user presses ESC and game is paused
+        if (Input.GetKeyUp(KeyCode.Escape) && gamePaused)
+        {
+            pauseMenu.SetActive(false);
+            gamePaused = false;
+            Time.timeScale = 1.0F;
+            SceneManager.LoadScene(0);
+
+        }
+    
+
+        
+        /* SKIDMARKS LOGIC */
+        SkidmarksLogic();
+
     }
 
+    /* SKIDMARKS LOGIC */
+    void SkidmarksLogic()
+    {
+
+        //If car is on the ground and user is pressing space create a new instance of skidmarks
+        if (Input.GetKey(KeyCode.Space) && !skidding && isGrounded) 
+        {
+            skidding = true;
+            //Enable the skidmarks original prefab instantiate it and then set it inactive again till it's needed again.
+            trailEmitter_Pref.SetActive(true);
+            trailEmitterInstantiated = Instantiate(trailEmitter_Pref, new Vector3(0f, 0.3f, -2.01f) , trailEmitter_Pref.transform.localRotation) as GameObject;
+            trailEmitterInstantiated.transform.SetParent(transform,false);
+            trailEmitter_Pref.SetActive(false);
+            
+            
+        } 
+
+        if (!isGrounded && (trailEmitterInstantiated != null) )
+        {
+            Destroy(trailEmitterInstantiated, 20f);
+            trailEmitterInstantiated.transform.parent = null;
+            skidding = false;
+        }
+        if (Input.GetKeyUp(KeyCode.Space))
+        {
+            if (trailEmitterInstantiated != null)
+            {
+                Destroy(trailEmitterInstantiated, 20f);
+                trailEmitterInstantiated.transform.parent = null;
+
+            }
+           skidding = false;
+        }
+
+        //Smoke Emitters enable/disablposition
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+            smokeEmitter.SetActive(!smokeEmitter.activeSelf);
+        }
+    }
 
    
  
     void FixedUpdate()
     {
+        //Make car-meshes invisible if it dies.
+        if (dead_timer <= 0)
+        {   //Make visible
+            if (isLocalPlayer)
+            {
+                CmdtellServerCarDestroyed(false);
+            }
+            rb.isKinematic = false;
+            foreach (MeshRenderer renderer in GetComponentsInChildren<MeshRenderer>())
+            {
+                renderer.enabled = true;
+            }
+            foreach (SkinnedMeshRenderer skinnedrendere in GetComponentsInChildren<SkinnedMeshRenderer>())
+            {
+                skinnedrendere.enabled = true;
+            }
+            gameObject.transform.root.Find("Smoke_Emitters/Smoke_L").gameObject.SetActive(true);
+            gameObject.transform.root.Find("Smoke_Emitters/Smoke_R").gameObject.SetActive(true);
+        }
+        else
+        {   //Make invisible
+            foreach (MeshRenderer renderer in GetComponentsInChildren<MeshRenderer>())
+            {
+                rb.isKinematic = true;
+                renderer.enabled = false;
+            }
+            foreach (SkinnedMeshRenderer skinnedrendere in GetComponentsInChildren<SkinnedMeshRenderer>())
+            {
+                skinnedrendere.enabled = false;
+            }
+            gameObject.transform.root.Find("Smoke_Emitters/Smoke_L").gameObject.SetActive(false);
+            gameObject.transform.root.Find("Smoke_Emitters/Smoke_R").gameObject.SetActive(false);
+        }
+
+        //Reduce Timers by 1 every second. If 0 keep it at 0.
+        if (boost_timer > 0)
+        {
+            boost_timer = boost_timer - Time.deltaTime;
+        }
+
+        if (dead_timer > 0)
+        {
+            dead_timer = dead_timer - Time.deltaTime;
+        }
+
+        if (!isLocalPlayer)
+        {
+            return;
+        }
+
 
         //Take the variable from tyresgrounded script and put it in this script
         TyresGrounded = GetComponentInChildren<tyrecheck>().TyresGrounded; 
@@ -341,24 +493,7 @@ public class NetworkCar : NetworkBehaviour
 
 
 
-        //Make car-meshes invisible if it dies.
-        if (dead_timer <= 0)
-        {
-            carDestroyed = false;
-            rb.isKinematic = false;
-            foreach (MeshRenderer renderer in GetComponentsInChildren<MeshRenderer>())
-            {
-                renderer.enabled = true;
-            }
-        }
-        else
-        {
-            foreach (MeshRenderer renderer in GetComponentsInChildren<MeshRenderer>())
-            {
-                rb.isKinematic = true;
-                renderer.enabled = false;
-            }
-        }
+
 
 
 
@@ -494,18 +629,6 @@ public class NetworkCar : NetworkBehaviour
         rb.AddForce(0, -customGrav, 0);
         
 
-        //Reduce Timers by 1 every second. If 0 keep it at 0.
-        if (boost_timer > 0)
-        {
-            boost_timer = boost_timer - Time.deltaTime;
-        }
-
-        if (dead_timer > 0)
-        {
-            dead_timer = dead_timer - Time.deltaTime;
-        }
-
-
 
 
     
@@ -513,20 +636,33 @@ public class NetworkCar : NetworkBehaviour
 
     IEnumerator CarSelfDestruct(Vector3 carPos)
     {
+        RoutineRunning = true;
         gameObject.GetComponent<AudioSource>().Play();
         Object boom=Instantiate(GameObject.Find("Explosion"), carPos, Quaternion.identity);
-        Destroy(boom, 4);
-        carDestroyed = true;
-        dead_timer = 3f;
+        CmdtellServerCarDestroyed(true);
+        CmdsetDeadTimer(3f);
         
 
         yield return new WaitForSeconds(3.0f);
+        CmdtellServerCarDestroyed(false);
+        RoutineRunning = false;
 
         transform.position = respawnPointArray[currentCheckpoint].position;
         transform.rotation = respawnPointArray[currentCheckpoint].rotation;
-}
+    }
 
+    [Command]
+    void CmdsetDeadTimer(float deadTimer)
+    {
+        dead_timer = deadTimer;
+    }
+    [Command]
+    void CmdtellServerCarDestroyed(bool destroyedState)
+    {
+        carDestroyed = destroyedState;
+    }
 
+    /*
     //GUI Design
     void OnGUI()
     {
@@ -547,6 +683,7 @@ public class NetworkCar : NetworkBehaviour
 
 
     }
+    */
 
 
 

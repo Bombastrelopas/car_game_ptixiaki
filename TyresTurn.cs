@@ -15,13 +15,13 @@ public class TyresTurn : MonoBehaviour {
 	void Update () {
         if (Input.GetKey("right"))
         {
-            targetRotation = Quaternion.Euler(0.1624f, 95.2903f, -0.0138f);
+            targetRotation = Quaternion.Euler(0f, 15f, 0f);
             transform.localRotation = Quaternion.Slerp(transform.localRotation, targetRotation, 0.15f);
 
         }
         else if (Input.GetKey("left"))
         {
-            targetRotation = Quaternion.Euler(-0.0726f, 65.4658f, 0.0261f);
+            targetRotation = Quaternion.Euler(0f, -15f, 0f);
             transform.localRotation = Quaternion.Slerp(transform.localRotation, targetRotation, 0.15f);
 
         }
@@ -33,4 +33,4 @@ public class TyresTurn : MonoBehaviour {
 
 
 	}
-}
+} 

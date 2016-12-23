@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine.UI;
 
-public class PreviewCamera : MonoBehaviour   {
+public class PreviewCameraSingleplayer : MonoBehaviour   {
     public Transform[] cameraPos;
     public bool finished = false; 
     public float fraction = 0;
@@ -145,7 +145,7 @@ public class PreviewCamera : MonoBehaviour   {
         gameObject.transform.root.FindChild("MusicController").GetComponent<MusicBox>().enabled = true;
 
         //After all is done disable this script for the rest of the game
-        gameObject.GetComponent<PreviewCamera>().enabled = false;
+        gameObject.GetComponent<PreviewCameraSingleplayer>().enabled = false;
 
     }
 

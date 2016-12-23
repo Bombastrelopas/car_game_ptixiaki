@@ -9,14 +9,14 @@ public class car_audio_NET : MonoBehaviour {
     public float startingpitch=0f;
     public float maxpitch = 1.2f;
     public Vector3 localVelocity;
-    NetworkCar carscript;
+    NewCaz carscript;
 
 
     // Use this for initialization
     void Start () {
         audio = gameObject.GetComponent<AudioSource>();
         GameObject thecar = transform.root.gameObject;
-        carscript = transform.root.GetComponent<NetworkCar>();
+        carscript = transform.root.GetComponent<NewCaz>();
         
         
 

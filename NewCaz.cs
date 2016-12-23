@@ -19,7 +19,12 @@ public class NewCaz : MonoBehaviour
     public Rigidbody rb;
     public float ExtraCarWeight = 500;
     public float mass;
-    
+
+    //Texture variables
+    public Texture alternativeEmission;
+    public Texture normalEmission;
+    public Renderer rend;
+    public Renderer rend2;
 
     //Other Booleans 
     public bool isboosted=false;
@@ -51,7 +56,19 @@ public class NewCaz : MonoBehaviour
     public Vector3 localVelb;
 
     //Other Stuff
-    public GameObject wheels; 
+    public GameObject wheels;
+
+    //Trail_Emitters STuff
+    public GameObject trailEmitter_R;
+    public GameObject trailEmitter_L;
+    public GameObject trailEmitter_Pref;
+
+    public Transform  trailEmitterTrans;
+    public GameObject trailEmitterInstantiated;
+    public bool skidding;
+    public bool alreadySkidding;
+
+    public GameObject smokeEmitter;
 
     //GUI variables
     public Texture2D metroMeter;
@@ -110,8 +127,21 @@ public class NewCaz : MonoBehaviour
         currentLap = 1;
         gamePaused = false;
 
+        //Skidmarks and Smoke Initialization
+        trailEmitter_R = gameObject.transform.Find("Skidmarks_Emitters/skidR").gameObject;
+        trailEmitter_L = gameObject.transform.Find("Skidmarks_Emitters/skidL").gameObject;
 
 
+        trailEmitter_Pref = GameObject.Find("Skidmarks_Emitters");
+        trailEmitterTrans = trailEmitter_Pref.transform;
+
+        skidding = false;
+        alreadySkidding = false;
+
+        smokeEmitter = gameObject.transform.FindChild("Smoke_Emitters").gameObject;
+
+        //Set emitters to inactive
+        trailEmitter_Pref.SetActive(false);
     
         //Set respawnpoint as start
         currentCheckpoint = 0;
@@ -122,6 +152,11 @@ public class NewCaz : MonoBehaviour
 
         //Get Blur Scripts which will be enabled when game is paused
         blurScripts = GetComponentsInChildren<Blur>();
+
+        //Set the normal emission texture as the current onee
+        rend = GameObject.Find("rearRightLight").GetComponent<Renderer>();
+        rend2 = GameObject.Find("rearLeftLight").GetComponent<Renderer>();
+        normalEmission = rend.material.GetTexture("_EmissionMap");
         
 
         /*
@@ -132,7 +167,6 @@ public class NewCaz : MonoBehaviour
             Debug.Log(checkPointArray);
         } 
         */
-
 
 
         //Other stuff for tests delete after.
@@ -196,6 +230,7 @@ public class NewCaz : MonoBehaviour
             if ((Input.GetKey("down")) && (speed > MaxBreak))
             {
                 speed = speed - Acceleration * Time.deltaTime;
+             
             }
             else if ((Input.GetKey("up")) && (speed < MaxSpeed))
             {
@@ -277,6 +312,56 @@ public class NewCaz : MonoBehaviour
 
             }
 
+            /* SKIDMARKS LOGIC */
+
+            //If car is on the ground and user is pressing space create a new instance of skidmarks
+            if (Input.GetKey(KeyCode.Space) && !skidding && isGrounded) 
+            {
+                skidding = true;
+                //Enable the skidmarks original prefab instantiate it and then set it inactive again till it's needed again.
+                trailEmitter_Pref.SetActive(true);
+                trailEmitterInstantiated = Instantiate(trailEmitter_Pref, new Vector3(0f, 0.3f, -2.01f) , trailEmitter_Pref.transform.localRotation) as GameObject;
+                trailEmitterInstantiated.transform.SetParent(transform,false);
+                trailEmitter_Pref.SetActive(false);
+                
+                
+            } 
+
+            if (!isGrounded && (trailEmitterInstantiated != null) )
+            {
+                Destroy(trailEmitterInstantiated, 20f);
+                trailEmitterInstantiated.transform.parent = null;
+                skidding = false;
+            }
+            if (Input.GetKeyUp(KeyCode.Space))
+            {
+                if (trailEmitterInstantiated != null)
+                {
+                    Destroy(trailEmitterInstantiated, 20f);
+                    trailEmitterInstantiated.transform.parent = null;
+ 
+                }
+               skidding = false;
+            }
+
+            //Smoke Emitters enable/disable
+            if (Input.GetKeyDown(KeyCode.E))
+            {
+                smokeEmitter.SetActive(!smokeEmitter.activeSelf);
+            }
+
+            //Change BackLights if user presses down
+
+        if (Input.GetKey(KeyCode.DownArrow))
+            {
+                rend.material.SetTexture("_EmissionMap", alternativeEmission);
+                rend2.material.SetTexture("_EmissionMap", alternativeEmission);
+            }
+        else
+            {
+                rend.material.SetTexture("_EmissionMap", normalEmission);
+                rend2.material.SetTexture("_EmissionMap", normalEmission);
+            }
 
         }
 

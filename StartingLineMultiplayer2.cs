@@ -1,7 +1,8 @@
 ﻿using UnityEngine;
 using System.Collections;
 using UnityEngine.UI;
-public class StartingLine : MonoBehaviour {
+using UnityEngine.SceneManagement;
+public class StartingLineMultiplayer2 : MonoBehaviour {
 
     //Variables
     NetworkCar carscript;
@@ -43,6 +44,7 @@ public class StartingLine : MonoBehaviour {
     }
 
     //Initiate variables
+
 	void Start () {
         //Find UI elements at start
         lapText = GameObject.Find("LapText").GetComponent<Text>();
@@ -64,6 +66,7 @@ public class StartingLine : MonoBehaviour {
         betterLapText.enabled = false;
 
         FinalLapText.enabled = false;
+
          
 
 	}
@@ -76,9 +79,10 @@ public class StartingLine : MonoBehaviour {
         if(col.tag == "Player")
         {
             passedAllCheckpoints = true;
-
             carscript =  col.GetComponent<NetworkCar>();
+            Debug.Log(carscript);
             //Check if the car has passed from all checkpoints
+            Debug.Log(carscript.currentLap);
             for(int i = 0; i<=6; i++)
             {
                 if(carscript.fairRace[i] != true)
@@ -88,14 +92,14 @@ public class StartingLine : MonoBehaviour {
             }
             if (passedAllCheckpoints == true)
             {
-                //This is for race so the game ends at lap3
-                /*
-                if (carscript.currentLap == 3)
+                //Finish race
+                if (carscript.currentLap == 3 && !carscript.raceFinished)
                 {
                     carscript.speed = 0;
                     carscript.racing = false;
+                    carscript.raceFinished = true;
+                    carscript.raceWon = true;
                 }
-                */
 
                 //Add a lap if the car has passed from all checkpoints
                 carscript.currentLap = carscript.currentLap + 1;
@@ -129,13 +133,13 @@ public class StartingLine : MonoBehaviour {
                 }
                 //Show final lap if it's race mode
 
-                /*
-                if (carscript.currentLap == 3)
+                //Debug.Log(SceneManager.GetActiveScene().name);
+                if (carscript.currentLap == 3 && SceneManager.GetActiveScene().name == "Physics_Test_scene")
                 {
+                    Debug.Log("Physics");
                     FinalLapText.enabled = true;
                     StartCoroutine(WaitFiveFinal());
                 }
-                */
 
                 carscript.lapTime = 0;
             }
